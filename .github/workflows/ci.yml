@@ -36,52 +36,35 @@ jobs:
           git config --global user.name "opencode-ci"
       - run: bun turbo test
 
-  build-linux:
+  build:
     needs: [typecheck, test]
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: opencode-linux-x64
+          - os: macos-latest
+            name: opencode-darwin-arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-      - run: bun install
-      - name: Build all Linux targets
-        run: bun ./script/build.ts --skip-install
-        working-directory: packages/opencode
-      - name: Package
-        run: |
-          cd packages/opencode/dist
-          for dir in opencode-linux-*/; do
-            name=${dir%/}
-            tar -czf "${name}.tar.gz" -C "${name}" bin
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: opencode-linux
-          path: packages/opencode/dist/opencode-linux-*.tar.gz
-          retention-days: 30
 
-  build-macos:
-    needs: [typecheck, test]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+
       - run: bun install
-      - name: Build all macOS targets
-        run: bun ./script/build.ts --skip-install
+
+      - name: Build
+        run: bun ./script/build.ts --single --skip-install
         working-directory: packages/opencode
+
       - name: Package
-        run: |
-          cd packages/opencode/dist
-          for dir in opencode-darwin-*/; do
-            name=${dir%/}
-            zip -r "${name}.zip" "${name}/bin"
-          done
+        run: tar -czf ${{ matrix.name }}.tar.gz -C packages/opencode/dist/${{ matrix.name }} bin
+
       - uses: actions/upload-artifact@v4
         with:
-          name: opencode-macos
-          path: packages/opencode/dist/opencode-darwin-*.zip
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}.tar.gz
           retention-days: 30
