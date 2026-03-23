@@ -43,16 +43,16 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: bun-linux-x64
+            name: opencode-linux-x64
             archive: tar.gz
           - os: ubuntu-latest
-            target: bun-linux-arm64
+            name: opencode-linux-arm64
             archive: tar.gz
           - os: macos-latest
-            target: bun-darwin-x64
+            name: opencode-darwin-x64
             archive: zip
           - os: macos-latest
-            target: bun-darwin-arm64
+            name: opencode-darwin-arm64
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -68,27 +68,20 @@ jobs:
         run: bun ./script/build.ts --single --skip-install
         working-directory: packages/opencode
 
-      - name: Find build output
-        id: find
-        run: |
-          dir=$(ls -d packages/opencode/dist/opencode-* 2>/dev/null | head -1)
-          name=$(basename "$dir")
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
-        run: tar -czf ${{ steps.find.outputs.name }}.tar.gz -C ${{ steps.find.outputs.dir }} bin
+        run: |
+          cd packages/opencode/dist/${{ matrix.name }}
+          tar -czf ../../../${{ matrix.name }}.tar.gz bin
 
       - name: Package (zip)
         if: matrix.archive == 'zip'
-        run: cd ${{ steps.find.outputs.dir }} && zip -r ../../${{ steps.find.outputs.name }}.zip bin
+        run: |
+          cd packages/opencode/dist/${{ matrix.name }}
+          zip -r ../../../${{ matrix.name }}.zip bin
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.find.outputs.name }}
-          path: |
-            packages/opencode/${{ steps.find.outputs.name }}.tar.gz
-            packages/opencode/${{ steps.find.outputs.name }}.zip
-          if-no-files-found: warn
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}.${{ matrix.archive }}
           retention-days: 30
