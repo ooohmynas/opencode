@@ -36,52 +36,52 @@ jobs:
           git config --global user.name "opencode-ci"
       - run: bun turbo test
 
-  build:
+  build-linux:
     needs: [typecheck, test]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            name: opencode-linux-x64
-            archive: tar.gz
-          - os: ubuntu-latest
-            name: opencode-linux-arm64
-            archive: tar.gz
-          - os: macos-latest
-            name: opencode-darwin-x64
-            archive: zip
-          - os: macos-latest
-            name: opencode-darwin-arm64
-            archive: zip
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
-
       - run: bun install
-
-      - name: Build
-        run: bun ./script/build.ts --single --skip-install
+      - name: Build all Linux targets
+        run: bun ./script/build.ts --skip-install
         working-directory: packages/opencode
-
-      - name: Package (tar.gz)
-        if: matrix.archive == 'tar.gz'
+      - name: Package
         run: |
-          cd packages/opencode/dist/${{ matrix.name }}
-          tar -czf ../../../${{ matrix.name }}.tar.gz bin
-
-      - name: Package (zip)
-        if: matrix.archive == 'zip'
-        run: |
-          cd packages/opencode/dist/${{ matrix.name }}
-          zip -r ../../../${{ matrix.name }}.zip bin
-
+          cd packages/opencode/dist
+          for dir in opencode-linux-*/; do
+            name=${dir%/}
+            tar -czf "${name}.tar.gz" -C "${name}" bin
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.name }}.${{ matrix.archive }}
+          name: opencode-linux
+          path: packages/opencode/dist/opencode-linux-*.tar.gz
+          retention-days: 30
+
+  build-macos:
+    needs: [typecheck, test]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install
+      - name: Build all macOS targets
+        run: bun ./script/build.ts --skip-install
+        working-directory: packages/opencode
+      - name: Package
+        run: |
+          cd packages/opencode/dist
+          for dir in opencode-darwin-*/; do
+            name=${dir%/}
+            zip -r "${name}.zip" "${name}/bin"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opencode-macos
+          path: packages/opencode/dist/opencode-darwin-*.zip
           retention-days: 30
